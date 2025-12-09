@@ -11,8 +11,8 @@ npx react-native run-android
 
 # Setting Up Login & SignUp Page
 By: Chelsea Colaljo
-- User Authentication and Profiles: Simple login/signup using email
-- User profile to track discovered Pokémon, with a personal Pokedex list.
+[/] User Authentication and Profiles: Simple login/signup using email
+[] User profile to track discovered Pokémon, with a personal Pokedex list.
 
 ADD THE FIREBASE KEY
 1. Download the google-services.json
@@ -54,9 +54,9 @@ Fix: Reset the cache by running this in a new terminal:
 
 # Adding the Pokedex Page
 By: Cheska Gayle Ouano
-- Fetch and display Pokémon data from PokeAPI
-- Search functionality: Allow users to search by name, type, or ID.
-- Sort Functionality: Allow users to sort pokemons based on their types.
+[/] Fetch and display Pokémon data from PokeAPI
+[/] Search functionality: Allow users to search by name, type, or ID.
+[/] Sort Functionality: Allow users to sort pokemons based on their types.
 
 Install React Navigation & Icons:
 npm install @react-navigation/native
@@ -66,14 +66,16 @@ npm install react-native-gesture-handler <-- ONLY IF RUNNING IN ANDROID
 npm install react-native-vector-icons
 
 CHALLENGES:
+The challenges encountered were the Search and Sorting Functionality and also the UI. There are times where UI is ruined whenever I type something in the searchbar. Another challenge was the sorting, I have trouble on figuring out how I should sort the pokemons and how to display them.
 
 SOLUTIONS:
-
+The solutions made were making small changes and having a trial error kind of changes to determine if the UI have now been fixed. The sorting was based on the type of pokemon they are.
 
 # Adding the Hunt Page
-- Use device GPS to detect user location.
-- "Hunt" mode: Simulate Pokémon encounters based on location
-- Notification alerts for nearby "Pokémon"
+By: Cheska Gayle Ouano
+[/] Use device GPS to detect user location.
+[] "Hunt" mode: Simulate Pokémon encounters based on location
+[] Notification alerts for nearby "Pokémon"
 
 Install Dependencies:
 npm install @react-native-community/geolocation react-native-maps
@@ -81,3 +83,7 @@ npm install @react-native-community/geolocation react-native-maps
 Add this in the dependencies in /android/app/src/build.gradle if not yet:
 implementation 'com.google.android.gms:play-services-maps:18.1.0'
 Then run: ./gradlew clean
+
+CHALLENGES:
+
+SOLUTIONS:

@@ -6,29 +6,43 @@ import {
   PermissionsAndroid,
   Platform,
   TouchableOpacity,
+  Image,
+  FlatList,
 } from "react-native";
 
 import Geolocation from "@react-native-community/geolocation";
-import MapView, { Marker } from "react-native-maps";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { useNavigation } from "@react-navigation/native";
 
-// Basic biome-based Pokémon list
-const BIOME_POKEMON = {
-  urban: ["rattata", "magnemite", "grimer", "voltorb"],
-  rural: ["pidgey", "caterpie", "oddish", "bellsprout"],
-  water: ["psyduck", "magikarp", "tentacool"],
-};
+// Helper: sprite URL from poke id
+const getPokemonImage = (id: number) =>
+  `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${id}.png`;
 
-// Get Pokémon sprite
-const getPokemonImage = (name: string) =>
-  `https://img.pokemondb.net/sprites/home/normal/${name}.png`;
+// Haversine distance (meters)
+function getDistanceMeters(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const toRad = (deg: number) => (deg * Math.PI) / 180;
+  const R = 6371e3; // Earth radius in meters
+  const φ1 = toRad(lat1);
+  const φ2 = toRad(lat2);
+  const Δφ = toRad(lat2 - lat1);
+  const Δλ = toRad(lon2 - lon1);
+
+  const a =
+    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
 
 export default function HuntScreen() {
-  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(
-    null
-  );
-  const [pokemonSpawns, setPokemonSpawns] = useState<any[]>([]);
+  const navigation = useNavigation();
+  const [location, setLocation] = useState<{ lat: number; lon: number } | null>(null);
+  const [pokemonList, setPokemonList] = useState<any[]>([]);
+  const [spawns, setSpawns] = useState<
+    { name: string; id: number; latitude: number; longitude: number }[]
+  >([]);
 
-  // Ask permission on Android
+  // Request Android permission
   const requestLocationPermission = async () => {
     try {
       if (Platform.OS === "android") {
@@ -44,64 +58,79 @@ export default function HuntScreen() {
     }
   };
 
-  const getLocation = async () => {
-    const hasPermission = await requestLocationPermission();
-    if (!hasPermission) {
-      console.log("Location permission denied");
-      return;
+  // Load 100 pokemon (names + urls)
+  const loadPokemonList = async () => {
+    try {
+      const res = await fetch("https://pokeapi.co/api/v2/pokemon?limit=100");
+      const data = await res.json();
+      setPokemonList(data.results || []);
+    } catch (err) {
+      console.log("Failed to load pokemon list:", err);
     }
+  };
+
+  // Generate spawns around player
+  const generateSpawns = (coords: { lat: number; lon: number }) => {
+    if (!pokemonList || pokemonList.length === 0) return;
+
+    const result: { name: string; id: number; latitude: number; longitude: number }[] = [];
+
+    for (let i = 0; i < 5; i++) {
+      const randIndex = Math.floor(Math.random() * pokemonList.length);
+      const p = pokemonList[randIndex];
+      const parts = p.url.split("/").filter(Boolean);
+      const id = parseInt(parts[parts.length - 1], 10);
+
+      const lat = coords.lat + (Math.random() - 0.5) * 0.003;
+      const lon = coords.lon + (Math.random() - 0.5) * 0.003;
+
+      result.push({
+        name: p.name,
+        id: Number.isNaN(id) ? randIndex + 1 : id,
+        latitude: lat,
+        longitude: lon,
+      });
+    }
+
+    setSpawns(result);
+  };
+
+  // Get location once and generate spawns
+  const getLocation = async () => {
+    const ok = await requestLocationPermission();
+    if (!ok) return;
 
     Geolocation.getCurrentPosition(
       (position) => {
-        const coords = {
-          lat: position.coords.latitude,
-          lon: position.coords.longitude,
-        };
+        const coords = { lat: position.coords.latitude, lon: position.coords.longitude };
         setLocation(coords);
-        generatePokemon(coords);
+        generateSpawns(coords);
       },
-      (error) => {
-        console.log("Error:", error);
-      },
+      (error) => console.log("Geolocation error:", error),
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
     );
   };
 
-  // Simple biome logic
-  const detectBiome = (lat: number, lon: number) => {
-    if (Math.abs(lon % 5) < 1) return "water";
-    if (lat > 10 && lon > 120) return "urban";
-    return "rural";
-  };
-
-  // Spawn Pokémon on the map
-  const generatePokemon = (coords: { lat: number; lon: number }) => {
-    const biome = detectBiome(coords.lat, coords.lon);
-    const biomeList = BIOME_POKEMON[biome];
-
-    const spawns = Array.from({ length: 5 }).map(() => {
-      const pokemon = biomeList[Math.floor(Math.random() * biomeList.length)];
-      return {
-        name: pokemon,
-        latitude: coords.lat + (Math.random() - 0.5) * 0.003,
-        longitude: coords.lon + (Math.random() - 0.5) * 0.003,
-        image: getPokemonImage(pokemon),
-      };
-    });
-
-    setPokemonSpawns(spawns);
-  };
+  useEffect(() => {
+    loadPokemonList();
+  }, []);
 
   useEffect(() => {
-    getLocation();
-  }, []);
+    if (pokemonList.length > 0) getLocation();
+  }, [pokemonList]);
+
+  // Navigate to ARScreen when a Pokémon is clicked
+  const handleCatchPokemon = (pokemon: { name: string; id: number }) => {
+    navigation.navigate("AR", { pokemon });
+  };
 
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Hunt Mode</Text>
 
-      {location && (
+      {location ? (
         <MapView
+          provider={PROVIDER_GOOGLE}
           style={styles.map}
           initialRegion={{
             latitude: location.lat,
@@ -109,64 +138,105 @@ export default function HuntScreen() {
             latitudeDelta: 0.01,
             longitudeDelta: 0.01,
           }}
+          showsUserLocation
         >
-          {/* User location marker */}
           <Marker
-            coordinate={{
-              latitude: location.lat,
-              longitude: location.lon,
-            }}
+            coordinate={{ latitude: location.lat, longitude: location.lon }}
             title="You"
             pinColor="blue"
           />
 
-          {/* Pokémon markers */}
-          {pokemonSpawns.map((p, index) => (
+          {spawns.map((p, idx) => (
             <Marker
-              key={index}
+              key={idx}
               coordinate={{ latitude: p.latitude, longitude: p.longitude }}
               title={p.name.toUpperCase()}
+              onPress={() => handleCatchPokemon({ name: p.name, id: p.id })}
             >
-              <View style={{ alignItems: "center" }}>
-                <Image
-                  source={{ uri: p.image }}
-                  style={{ width: 45, height: 45 }}
-                />
-              </View>
+              <Image source={{ uri: getPokemonImage(p.id) }} style={styles.markerImg} />
             </Marker>
           ))}
         </MapView>
+      ) : (
+        <View style={styles.center}>
+          <Text>Getting location...</Text>
+        </View>
       )}
 
-      {!location && <Text>Getting location...</Text>}
-
-      <TouchableOpacity style={styles.button} onPress={getLocation}>
+      <TouchableOpacity style={styles.button} onPress={() => location && generateSpawns(location)}>
         <Text style={styles.buttonText}>Refresh Hunt</Text>
       </TouchableOpacity>
+
+      {/* Bottom panel */}
+      <View style={styles.bottomPanel}>
+        <Text style={styles.panelTitle}>Nearby Pokémon</Text>
+
+        <FlatList
+          data={spawns}
+          keyExtractor={(item) => `${item.id}-${item.latitude.toFixed(5)}`}
+          horizontal={false}
+          renderItem={({ item }) => {
+            const dist = location
+              ? getDistanceMeters(location.lat, location.lon, item.latitude, item.longitude)
+              : 0;
+            return (
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() => handleCatchPokemon({ name: item.name, id: item.id })}
+              >
+                <Image source={{ uri: getPokemonImage(item.id) }} style={styles.pokeImg} />
+                <View style={{ marginLeft: 10 }}>
+                  <Text style={styles.pokeName}>{item.name.toUpperCase()}</Text>
+                  <Text style={styles.pokeDist}>{dist} m</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+        />
+      </View>
     </View>
   );
 }
 
-import { Image } from "react-native";
-
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    textAlign: "center",
-    paddingVertical: 10,
-  },
-  map: {
-    width: "100%",
-    height: "80%",
-  },
+  title: { fontSize: 20, fontWeight: "bold", textAlign: "center", paddingVertical: 8 },
+  map: { width: "100%", height: "90%" },
+  center: { flex: 1, justifyContent: "center", alignItems: "center" },
   button: {
-    marginTop: 10,
+    position: "absolute",
+    right: 16,
+    bottom: 220,
     backgroundColor: "#4caf50",
-    padding: 12,
-    marginHorizontal: 20,
-    borderRadius: 10,
+    padding: 10,
+    borderRadius: 8,
+    elevation: 4,
   },
-  buttonText: { color: "#fff", textAlign: "center", fontSize: 16 },
+  buttonText: { color: "#fff", fontWeight: "600" },
+  bottomPanel: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    maxHeight: 210,
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 14,
+    borderTopRightRadius: 14,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 18,
+    elevation: 10,
+  },
+  panelTitle: { fontSize: 16, fontWeight: "700", marginBottom: 8 },
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    borderBottomWidth: 0.5,
+    borderColor: "#eee",
+  },
+  pokeImg: { width: 44, height: 44 },
+  pokeName: { fontSize: 14, fontWeight: "700" },
+  pokeDist: { fontSize: 13, color: "#666" },
+  markerImg: { width: 45, height: 45 },
 });
