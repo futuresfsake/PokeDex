@@ -2,6 +2,8 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
+// 1. Correct import based on your screenshot
+import HomePageScreen from '../screens/HomePageScreen';
 import HuntScreen from '../screens/HuntScreen';
 import PokedexScreen from '../screens/PokedexScreen';
 import ARScreen from '../screens/ARScreen';
@@ -21,7 +23,9 @@ export default function TabNavigator() {
         tabBarIcon: ({ color, size }) => {
           let iconName = '';
 
-          if (route.name === 'Hunt') iconName = 'search-outline';
+          // 2. Add icon logic for 'Home'
+          if (route.name === 'Home') iconName = 'home-outline';
+          else if (route.name === 'Hunt') iconName = 'search-outline';
           else if (route.name === 'PokeDex') iconName = 'book-outline';
           else if (route.name === 'AR') iconName = 'scan-outline';
           else if (route.name === 'Feed') iconName = 'share-outline';
@@ -31,6 +35,8 @@ export default function TabNavigator() {
         },
       })}
     >
+      {/* 3. Add the Screen using your specific component name */}
+      <Tab.Screen name="Home" component={HomePageScreen} />  
       <Tab.Screen name="Hunt" component={HuntScreen} />
       <Tab.Screen name="PokeDex" component={PokedexScreen} />
       <Tab.Screen name="AR" component={ARScreen} />
