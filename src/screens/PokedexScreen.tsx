@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+
 import {
   View,
   Text,
@@ -41,6 +43,7 @@ const TYPE_COLORS: { [key: string]: string } = {
 const CARD_MARGIN = 5;
 
 export default function PokedexScreen() {
+  const navigation = useNavigation();
   const [pokemonList, setPokemonList] = useState<Pokemon[]>([]);
   const [filteredList, setFilteredList] = useState<Pokemon[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,42 +118,43 @@ export default function PokedexScreen() {
 
   // Render Pokémon card
   const renderItem = ({ item }: { item: Pokemon }) => {
-    const isSelected = pressedCardId === item.id;
+      const isSelected = pressedCardId === item.id;
 
-    return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => setPressedCardId(item.id)} // persist selection
-        style={[
-          styles.card,
-          { backgroundColor: isSelected ? "#16a134ff" : "#f2f2f2" },
-        ]}
-      >
-        <Image source={{ uri: item.image }} style={styles.image} />
-        <Text style={[styles.id, isSelected && { color: "#fff" }]}>
-          #{item.id.toString().padStart(4, "0")}
-        </Text>
-        <Text style={[styles.name, isSelected && { color: "#fff" }]}>
-          {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
-        </Text>
-        <View style={styles.typesContainer}>
-          {item.types.map((type) => (
-            <View
-              key={type}
-              style={[
-                styles.typeBadge,
-                { backgroundColor: isSelected ? "#fff" : TYPE_COLORS[type] || "#777" },
-              ]}
-            >
-              <Text style={[styles.typeText, isSelected && { color: "#16a134ff" }]}>
-                {type.toUpperCase()}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </TouchableOpacity>
-    );
-  };
+      return (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate("Details", { id: item.id })}
+          style={[
+            styles.card,
+            { backgroundColor: isSelected ? "#16a134ff" : "#f2f2f2" },
+          ]}
+        >
+          <Image source={{ uri: item.image }} style={styles.image} />
+          <Text style={[styles.id, isSelected && { color: "#fff" }]} >
+            #{item.id.toString().padStart(4, "0")}
+          </Text>
+          <Text style={[styles.name, isSelected && { color: "#fff" }]}>
+            {item.name.charAt(0).toUpperCase() + item.name.slice(1)}
+          </Text>
+
+          <View style={styles.typesContainer}>
+            {item.types.map((type) => (
+              <View
+                key={type}
+                style={[
+                  styles.typeBadge,
+                  { backgroundColor: isSelected ? "#fff" : TYPE_COLORS[type] || "#777" },
+                ]}
+              >
+                <Text style={[styles.typeText, isSelected && { color: "#16a134ff" }]}>
+                  {type.toUpperCase()}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </TouchableOpacity>
+      );
+    };
 
   if (loading) {
     return (
