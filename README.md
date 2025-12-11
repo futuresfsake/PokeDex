@@ -93,8 +93,11 @@ SOLUTIONS:
 By: Joanna Alyssa Mondelo <3
 
 [✔] Added DetailsScreen
+
 [✔] Installed: npm install react-native-share
+
 [✔] Navigation from PokedexScreen → DetailsScreen
+
 [✔] Improved and playful UI
 
 DESCRIPTION:
@@ -117,8 +120,11 @@ FeedScreen Modification
 By: Joanna Alyssa Mondelo <3
 
 [✔] Improved UI (colorful + playful theme)
+
 [✔] Support for posting text & images
+
 [✔] Share posts to installed apps
+
 [✔] Like, unlike, comment, and delete posts
 
 DESCRIPTION:
