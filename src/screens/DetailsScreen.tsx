@@ -31,7 +31,7 @@ const TYPE_COLORS: { [key: string]: string } = {
   fairy: "#D685AD",
 };
 
-export default function DetailsScreen({ route }) {
+export default function DetailsScreen({ route }: any) {
   const { id } = route.params;
   const [pokemon, setPokemon] = useState<any>(null);
   const [loading, setLoading] = useState(true);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -12,6 +12,8 @@ import {
   Alert
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+import AsyncStorage from '@react-native-async-storage/async-storage'; // Import Storage
+import { useFocusEffect } from '@react-navigation/native'; // Import Focus Hook
 
 // --- 1. ENHANCED DATA TYPES ---
 interface UserStats {
@@ -43,27 +45,21 @@ interface Mission {
   color: string;
 }
 
-// NEW: Feed Post Interface
+// Feed Post Interface matching your FeedScreen
 interface FeedPost {
-  id: number;
-  type: 'news' | 'user'; // Distinguish between official news and user posts
+  id: string; // Changed to string to match FeedScreen
   username: string;
-  userAvatar: string;
+  handle?: string;
   content: string;
-  postImage?: string;
-  timestamp: string;
+  imageUrl?: string;
+  timestamp: number; // Changed to number to match FeedScreen
   likes: number;
-  comments: number;
-}
-
-interface ActiveBonus {
-  id: number;
-  label: string;
-  icon: string;
-  color: string;
+  trainerClass?: string;
+  isStatic?: boolean;
 }
 
 // --- CONSTANTS ---
+const STORAGE_KEY = '@pokedex_feed_v4'; // MUST MATCH FEED SCREEN KEY
 const { width } = Dimensions.get('window');
 const TYPE_COLORS: { [key: string]: string } = {
   normal: "#A8A77A", fire: "#EE8130", water: "#6390F0", electric: "#F7D02C",
@@ -72,11 +68,37 @@ const TYPE_COLORS: { [key: string]: string } = {
   rock: "#B6A136", ghost: "#735797", dragon: "#6F35FC", steel: "#B7B7CE", fairy: "#D685AD",
 };
 
+// --- STATIC DATA FOR FEED (Fallback if empty) ---
+const INITIAL_STATIC_POSTS: FeedPost[] = [
+  {
+    id: 'static-1',
+    username: 'Professor Oak',
+    handle: '@kanto_research', 
+    content: 'Alert: Reports of a Shiny Gyarados at the Lake of Rage! 🔴',
+    timestamp: Date.now() - 3600000, 
+    likes: 5420,
+    imageUrl: 'https://media.giphy.com/media/ydU6Wf0rCqO52/giphy.gif',
+    isStatic: true,
+    trainerClass: 'Professor'
+  },
+  {
+    id: 'static-2',
+    username: 'Cynthia',
+    handle: '@sinnoh_champ', 
+    content: 'Garchomp is restless today. I sense a distortion nearby.',
+    timestamp: Date.now() - 7200000, 
+    likes: 8900,
+    imageUrl: 'https://img.pokemondb.net/artwork/large/garchomp.jpg',
+    isStatic: true,
+    trainerClass: 'Champion'
+  }
+];
+
 export default function HomePageScreen({ navigation }: any) {
   const [userStats, setUserStats] = useState<UserStats | null>(null);
   const [nearYouList, setNearYouList] = useState<Pokemon[]>([]);
   const [missions, setMissions] = useState<Mission[]>([]);
-  const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]); // Replaces simple news
+  const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]); 
   const [greeting, setGreeting] = useState("Welcome");
 
   // --- LOAD DATA ---
@@ -86,7 +108,7 @@ export default function HomePageScreen({ navigation }: any) {
     else if (hour < 18) setGreeting("Good Afternoon");
     else setGreeting("Good Evening");
 
-    // 2. SIMULATE DYNAMIC DATA FETCH
+    // Simulate fetching user stats
     setTimeout(() => {
       setUserStats({
         pokemonImageUri: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/25.png', 
@@ -104,53 +126,32 @@ export default function HomePageScreen({ navigation }: any) {
         { id: 1, title: 'Catch 5 Fire-type Pokémon', progress: 3, goal: 5, reward: '500 XP', icon: 'flame', color: '#EE8130' },
         { id: 2, title: 'Walk 5km', progress: 2.4, goal: 5.0, reward: '1x Incubator', icon: 'walk', color: '#2E7D32' },
       ]);
-
-      // --- HYBRID FEED SYSTEM ---
-      // We combine Static "Official News" with Simulated "Dynamic User Posts"
-      const staticNews: FeedPost[] = [
-        { 
-          id: 101, 
-          type: 'news',
-          username: 'Official PokeExplorer', 
-          userAvatar: 'https://img.icons8.com/color/48/pokeball--v1.png', 
-          content: 'COMMUNITY DAY ALERT: Dragon-types are appearing more frequently this weekend! 🐉',
-          postImage: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/149.png',
-          timestamp: '2h ago',
-          likes: 1240,
-          comments: 45
-        }
-      ];
-
-      const dynamicUserPosts: FeedPost[] = [
-        {
-          id: 202,
-          type: 'user',
-          username: 'GymLeader_Misty',
-          userAvatar: 'https://randomuser.me/api/portraits/women/44.jpg',
-          content: 'Just defeated the Cerulean Gym! My Starmie is unstoppable 💧',
-          timestamp: '15m ago',
-          likes: 42,
-          comments: 8
-        },
-        {
-          id: 203,
-          type: 'user',
-          username: 'AshK_Fan99',
-          userAvatar: 'https://randomuser.me/api/portraits/men/32.jpg',
-          content: 'Does anyone know where to find a wild Eevee near Central Park?',
-          postImage: 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/133.png',
-          timestamp: '1h ago',
-          likes: 12,
-          comments: 24
-        }
-      ];
-
-      setFeedPosts([...staticNews, ...dynamicUserPosts]);
-
     }, 1000);
 
     fetchNearYouPokemon();
   }, []);
+
+  // --- REAL TIME FEED SYNC ---
+  // This runs every time you look at the screen
+  useFocusEffect(
+    useCallback(() => {
+      const fetchFeed = async () => {
+        try {
+          const storedPosts = await AsyncStorage.getItem(STORAGE_KEY);
+          if (storedPosts) {
+            const parsed = JSON.parse(storedPosts);
+            // Merge static posts with user posts (newest first)
+            setFeedPosts([...INITIAL_STATIC_POSTS, ...parsed]);
+          } else {
+            setFeedPosts(INITIAL_STATIC_POSTS);
+          }
+        } catch (e) {
+          console.error("Failed to sync feed", e);
+        }
+      };
+      fetchFeed();
+    }, [])
+  );
 
   const fetchNearYouPokemon = async () => {
     try {
@@ -178,7 +179,6 @@ export default function HomePageScreen({ navigation }: any) {
 
   // --- SUB-COMPONENTS ---
 
-  // 1. ACTIVE BONUSES (New Content)
   const ActiveBonusBar = () => (
     <View style={styles.bonusContainer}>
       <View style={[styles.bonusItem, { backgroundColor: '#E3F2FD' }]}>
@@ -192,49 +192,66 @@ export default function HomePageScreen({ navigation }: any) {
     </View>
   );
 
-  // 2. FEED POST CARD (New Content)
-  const FeedCard = ({ item }: { item: FeedPost }) => (
-    <View style={styles.feedCard}>
-      {/* Feed Header */}
-      <View style={styles.feedHeader}>
-        <Image source={{ uri: item.userAvatar }} style={styles.feedAvatar} />
-        <View style={{flex: 1}}>
-          <View style={{flexDirection:'row', alignItems:'center'}}>
-            <Text style={styles.feedUsername}>{item.username}</Text>
-            {item.type === 'news' && <Ionicons name="checkmark-circle" size={14} color="#2196F3" style={{marginLeft: 4}}/>}
+  // --- FEED POST CARD (Updated to handle Real Data) ---
+  const FeedCard = ({ item }: { item: FeedPost }) => {
+    // Helper to format time relative to now
+    const timeAgo = (timestamp: number) => {
+      const seconds = Math.floor((Date.now() - timestamp) / 1000);
+      if (seconds < 60) return `${seconds}s ago`;
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      return `${Math.floor(hours / 24)}d ago`;
+    };
+
+    return (
+      <View style={styles.feedCard}>
+        {/* Feed Header */}
+        <View style={styles.feedHeader}>
+          {/* Avatar based on logic */}
+          <View style={styles.feedAvatarContainer}>
+            {item.isStatic ? (
+                <Image 
+                  source={{ uri: 'https://upload.wikimedia.org/wikipedia/commons/thumb/5/53/Pok%C3%A9_Ball_icon.svg/1024px-Pok%C3%A9_Ball_icon.svg.png' }} 
+                  style={{ width: 24, height: 24 }} 
+                />
+            ) : (
+                <Ionicons name="person" size={20} color="#555" />
+            )}
           </View>
-          <Text style={styles.feedTime}>{item.timestamp}</Text>
+          
+          <View style={{flex: 1}}>
+            <View style={{flexDirection:'row', alignItems:'center'}}>
+              <Text style={styles.feedUsername} numberOfLines={1}>{item.username}</Text>
+              {item.isStatic && <Ionicons name="checkmark-circle" size={14} color="#2196F3" style={{marginLeft: 4}}/>}
+            </View>
+            <Text style={styles.feedTime}>{timeAgo(item.timestamp)}</Text>
+          </View>
         </View>
-        <TouchableOpacity>
-           <Ionicons name="ellipsis-horizontal" size={20} color="#999" />
-        </TouchableOpacity>
+
+        {/* Feed Content */}
+        <Text style={styles.feedContent} numberOfLines={3}>{item.content}</Text>
+        
+        {item.imageUrl && (
+          <Image source={{ uri: item.imageUrl }} style={styles.feedImage} resizeMode="cover" />
+        )}
+
+        {/* Feed Footer */}
+        <View style={styles.feedFooter}>
+          <View style={styles.interactionRow}>
+            <Ionicons name="heart-outline" size={18} color="#555" />
+            <Text style={styles.interactionText}>{item.likes}</Text>
+          </View>
+          <View style={styles.interactionRow}>
+            <Ionicons name="chatbubble-outline" size={18} color="#555" />
+            <Text style={styles.interactionText}>{item.isStatic ? 45 : 0}</Text>
+          </View>
+        </View>
       </View>
+    );
+  };
 
-      {/* Feed Content */}
-      <Text style={styles.feedContent}>{item.content}</Text>
-      
-      {item.postImage && (
-        <Image source={{ uri: item.postImage }} style={styles.feedImage} />
-      )}
-
-      {/* Feed Footer */}
-      <View style={styles.feedFooter}>
-        <View style={styles.interactionRow}>
-          <Ionicons name="heart-outline" size={20} color="#555" />
-          <Text style={styles.interactionText}>{item.likes}</Text>
-        </View>
-        <View style={styles.interactionRow}>
-          <Ionicons name="chatbubble-outline" size={19} color="#555" />
-          <Text style={styles.interactionText}>{item.comments}</Text>
-        </View>
-        <View style={[styles.interactionRow, { marginLeft: 'auto' }]}>
-           <Ionicons name="share-social-outline" size={20} color="#555" />
-        </View>
-      </View>
-    </View>
-  );
-
-  // Other Existing Components...
   const StatItem = ({ icon, value, label, color }: any) => (
     <View style={styles.statItem}>
       <View style={[styles.statIconBox, { backgroundColor: color + '20' }]}>
@@ -343,10 +360,10 @@ export default function HomePageScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* --- NEW: ACTIVE BONUSES --- */}
+        {/* --- ACTIVE BONUSES --- */}
         <ActiveBonusBar />
 
-        {/* --- HUNT CTA --- */}
+        {/* --- HUNT BUTTON --- */}
         <TouchableOpacity style={styles.huntButton} activeOpacity={0.9} onPress={() => navigation.navigate('Hunt')}>
           <View style={styles.huntContent}>
              <View>
@@ -357,7 +374,7 @@ export default function HomePageScreen({ navigation }: any) {
           </View>
         </TouchableOpacity>
 
-        {/* --- NEW: POKEMON OF THE DAY (Simple Box) --- */}
+        {/* --- POKEMON OF THE DAY --- */}
         <View style={styles.potdContainer}>
            <View style={styles.potdTextContainer}>
               <Text style={styles.potdLabel}>POKÉMON OF THE DAY</Text>
@@ -388,7 +405,7 @@ export default function HomePageScreen({ navigation }: any) {
           />
         </View>
 
-        {/* --- DAILY RESEARCH (MISSIONS) --- */}
+        {/* --- DAILY RESEARCH --- */}
         <View style={styles.sectionContainer}>
            <Text style={[styles.sectionTitle, { marginLeft: 20, marginBottom: 15 }]}>Daily Research</Text>
            {missions.map((mission) => (
@@ -396,7 +413,7 @@ export default function HomePageScreen({ navigation }: any) {
            ))}
         </View>
 
-        {/* --- NEW: COMMUNITY PULSE (FEED) --- */}
+        {/* --- COMMUNITY PULSE (SYNCED FEED) --- */}
         <View style={styles.sectionContainer}>
            <View style={styles.sectionHeader}>
              <Text style={styles.sectionTitle}>Community Pulse</Text>
@@ -405,7 +422,7 @@ export default function HomePageScreen({ navigation }: any) {
              </TouchableOpacity>
            </View>
            
-           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20 }}>
+           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingLeft: 20, paddingRight: 20 }}>
               {feedPosts.map((post) => (
                 <FeedCard key={post.id} item={post} />
               ))}
@@ -540,11 +557,15 @@ const styles = StyleSheet.create({
 
   // --- NEW: FEED CARDS ---
   feedCard: {
-    width: 280, backgroundColor: 'white', borderRadius: 16, marginRight: 15, padding: 16,
+    width: 260, backgroundColor: 'white', borderRadius: 16, marginRight: 15, padding: 16,
     shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
   },
   feedHeader: { flexDirection: 'row', marginBottom: 12 },
-  feedAvatar: { width: 36, height: 36, borderRadius: 18, marginRight: 10 },
+  feedAvatarContainer: { 
+    width: 32, height: 32, borderRadius: 16, marginRight: 10, 
+    justifyContent: 'center', alignItems: 'center', 
+    backgroundColor: '#f0f0f0' 
+  },
   feedUsername: { fontSize: 14, fontWeight: '700', color: '#333' },
   feedTime: { fontSize: 11, color: '#999' },
   feedContent: { fontSize: 13, color: '#444', lineHeight: 20, marginBottom: 12 },
