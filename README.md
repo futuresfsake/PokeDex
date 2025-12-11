@@ -87,3 +87,52 @@ Then run: ./gradlew clean
 CHALLENGES:
 
 SOLUTIONS:
+
+
+<h2>DetailsScreen Implementation</h2>
+By: Joanna Alyssa Mondelo <3
+
+[✔] Added DetailsScreen
+[✔] Installed: npm install react-native-share
+[✔] Navigation from PokedexScreen → DetailsScreen
+[✔] Improved and playful UI
+
+DESCRIPTION:
+When the user clicks a Pokémon in PokedexScreen.tsx, it navigates to DetailsScreen.tsx where detailed information is displayed. The UI was upgraded to be more fun, colorful, and engaging.
+
+CHALLENGES:
+Creating an enjoyable, playful UI without breaking the original layout.
+Ensuring smooth navigation and correct data passing between screens.
+Integrating react-native-share properly.
+Adjusting layout issues caused by additional UI components.
+
+SOLUTIONS:
+Applied multiple UI refinements using trial-and-error to fix spacing, alignment, and design problems.
+Ensured navigation works properly by passing Pokémon ID and fetching full data.
+Successfully implemented react-native-share for sharing Pokémon details.
+Used flexible styling and tested responsiveness to maintain layout consistency.
+
+<h2>FeedScreen Modification</h2>
+FeedScreen Modification
+By: Joanna Alyssa Mondelo <3
+
+[✔] Improved UI (colorful + playful theme)
+[✔] Support for posting text & images
+[✔] Share posts to installed apps
+[✔] Like, unlike, comment, and delete posts
+
+DESCRIPTION:
+The FeedScreen was redesigned to match the fun and colorful style of the Pokémon game. New features were added such as posting, liking, commenting, sharing, and deleting posts.
+
+CHALLENGES:
+Designing a FeedScreen UI that fits the playful game aesthetic.
+Implementing like/unlike, comment, delete, and share functionalities smoothly.
+Handling image + text uploads properly.
+Ensuring share integration works on various devices.
+
+SOLUTIONS:
+Redesigned UI components to look more lively and thematic.
+Improved state management for like, unlike, comment, and delete actions.
+Integrated react-native-share and tested compatibility across apps.
+Cleaned up rendering logic to handle posts with images and text without errors.
+
